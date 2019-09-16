@@ -1,0 +1,154 @@
+---
+title: "Untitled"
+author: "Jatinder Singh"
+date: "March 15, 2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+school <- read.csv(file= "C:\\Data Anaytics UTEP\\Final project Data Mining\\SchoolRanking.csv", header = TRUE)
+dat<-school
+dim(school)
+vnames <- colnames(school)
+
+```
+```{r}
+
+# ==========================================================
+# # TH V-FOLD CROSS VALIDATION METHOD FOR TREE SIZE SELECTION
+# # ==========================================================#
+library(rpart)
+colnames(dat)
+control0 <- rpart.control(minsplit=10, minbucket=3, maxdepth=10,
+        cp=0, maxcompete=4, 
+        maxsurrogate=5, usesurrogate=2, surrogatestyle=0,xval=10) 
+#school$Rank <- school$Rank..2013.14./(nrow(school) + 1)
+
+model.cart <- rpart(school$Rank..2013.14. ~ Number.Fulltime.Teachers + Student.Teacher.Ratio +Percent.American.Indian + Percent.Hispanic + Percent.Two.or.More.Races + Number.Students + Percent.African.American + Percent.Asian + Percent.Pacific.Islander + Percent.White +  Percent.African.American + Percent.Free.Disc.Lunch + Free.Lunch,data=school,method="anova", control=control0)
+plot(model.cart); 
+text(model.cart)
+# tre0 <- rpart(Tier1 ~ Number.Fulltime.Teachers + Student.Teacher.Ratio +Percent.American.Indian + Percent.Hispanic + Percent.Two.or.More.Races + Number.Students + Percent.African.American + Percent.Asian + Percent.Pacific.Islander + Percent.White +  Percent.African.American + Percent.Free.Disc.Lunch + Free.Lunch, data=school,  method="class", control=control0,
+# 		parms=list(split="gini"))
+#school$Grade<- as.numeric(school$Rank)
+
+```
+
+```{r}
+# install.packages("rattle")
+# install.packages("rJava")
+# install.packages("rpart.plot")
+# install.packages("RColorBrewer")
+# install.packages("party")
+# install.packages("partykit")
+# install.packages("caret")
+library(RColorBrewer)				# Color selection for fancy tree plot
+library(party)					# Alternative decision tree algorithm
+#library(rJava)					# If you encounter a rJASA problem here, re-install Java.
+library(partykit)					# Convert rpart object to BinaryTree
+ library(caret)					# Just a data source for this script
+
+# FUNCTION prp FROM PACKAGE rpart.plot 
+library(rpart.plot)				# Enhanced tree plots
+?prp
+prp(model.cart)						# Will plot the tree
+prp(model.cart,varlen = 3)	
+
+# Interatively prune the tree
+model.cart1 <- prp(model.cart, snip=TRUE)$obj # interactively trim the tree
+prp(model.cart1) # display the new tree
+
+```
+```{r}
+# A fancy plot from rattle
+#install.packages('RGtk2')
+library(rattle)	
+# Fancy tree plot
+rattle()
+fancyRpartPlot(model.cart)
+```
+
+```{r}
+
+# ------------------------- 
+# TREE SIZE SELECTION
+# -------------------------
+#install.packages("graphics")
+library(graphics)
+library(rattle)
+# APPLY 1-SE (1-STANDARD ERROR METHOD) FOR SELECT THE BEST TREE SIZE
+# SUGGESTED IN THE CART METHODOLOGY.
+printcp(model.cart)
+plotcp(model.cart,minline = TRUE,lty = 3, col = 1)      # 1-SE TREE SIZE SELECTION
+# plotcp(model.cart1, minline = TRUE) # 1SE
+
+cv.error <- (model.cart$cptable)[,4]
+a0 <- 1     # IF a0=0, THEN 0SE
+SE1 <- min(cv.error) + a0*((model.cart$cptable)[,5])[which.min(cv.error)]      # 1SE
+position <- min((1:length(cv.error))[cv.error <= SE1])
+n.size  <- (model.cart$cptable)[,2] + 1  # TREE SIZE IS ONE PLUS NUMBER OF SPLITS. 
+best.size <- n.size[position]; best.size
+best.cp <-  sqrt(model.cart$cptable[position,1] *  model.cart$cptable[(position-1),1])
+#best.cp <- 0.006
+```
+
+```{r}
+
+# OBTAIN THE OPTIMIAL SUBTREE
+# ----------------------------
+best.tree <- prune(model.cart, cp=best.cp)
+best.tree
+
+```
+
+```{r}
+# predict(model.cart, newdata = school, type = "vector")
+# plot(model.cart,school.test$Rank..2013.14.)
+y.hat = predict(model.cart, newdata = school.test, type = "vector",interval="confidence")
+plot(y.hat, school.test$Rank..2013.14.)
+
+```
+
+```{r}
+# PARTITION DATA
+training.id <- sort(sample(nrow(school), ceiling(nrow(school)*2/3)))
+school.train <- school[training.id,]
+school.test <- school[-training.id,]
+school.test
+library(rpart)
+control0 <- rpart.control(minsplit=10, minbucket=3, maxdepth=15,
+        cp=0, maxcompete=4, 
+        maxsurrogate=5, usesurrogate=2, surrogatestyle=0,  		# SURROGATE SPLITS FOR MISSING DATA
+        xval=10)									# SET THE VALUE V FOR V-FOLD CROSS VALIDATION
+model.cart1 <- rpart(training.id~., data=school.train, method='class', control=control0,
+	parms=list(split='information'))
+plot(best.tree)
+plotcp(model.cart1)
+dev.print(postscript, 'spam-fig1.ps', paper='special', height=6, width=10)
+printcp(model.cart1)
+
+btre <- prune(model.cart, cp=.0028)
+plot(btre, uniform=T, compress=T, margin=.05)
+text(btre, use.n=T)
+dev.print(postscript, 'spam-fig2.ps', paper='special', height=8.5, width=11)
+
+print(btre, cp=.05)
+
+```
+# ```{r}
+# # TRAINING ERROR
+# btre.train.class <- predict(btre, type='class')
+# table(predicted=btre.train.class, actual=school.train$grade)
+# 
+# # TEST ERROR
+# btre.test.class <- predict(btre, type='class', newdata=grade.test)
+# table(predicted=btre.test.class, actual=school.test$grade)
+# 
+# # PREDICTED PROBABILITY FOR MAKING ROC CURVE
+# btre.test.p <- predict(r2, type='prob', newdata=grade.test)[,2]
+# ```
+
+
