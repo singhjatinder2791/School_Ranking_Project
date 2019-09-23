@@ -105,9 +105,7 @@ best.tree
 ```
 
 ```{r}
-# predict(model.cart, newdata = school, type = "vector")
-# plot(model.cart,school.test$Rank..2013.14.)
-y.hat = predict(model.cart, newdata = school.test, type = "vector",interval="confidence")
+y.hat = predict(model.cart, newdata = school.test, type = "vector")
 plot(y.hat, school.test$Rank..2013.14.)
 
 ```
